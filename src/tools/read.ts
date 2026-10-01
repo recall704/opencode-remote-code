@@ -79,8 +79,13 @@ export function createReadTool(pathMapper: PathMapper, syncEngine: SyncEngine, s
       }
 
       const localPath = pathMapper.toLocal(remotePath)
-      const limit = args.limit ?? DEFAULT_LIMIT
-      const offset = (args.offset ?? 1) - 1
+      // Agents (and OpenCode's native read tool) may pass a 0-based `offset`;
+      // the schema here is 1-indexed. Clamp so offset 0 / negative / NaN cannot
+      // produce a negative start index (which crashed on `lines[-1].length`).
+      const rawOffset = Number(args.offset ?? 1)
+      const offset = Number.isFinite(rawOffset) ? Math.max(0, Math.floor(rawOffset) - 1) : 0
+      const rawLimit = Number(args.limit ?? DEFAULT_LIMIT)
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : DEFAULT_LIMIT
 
       // Determine remote type (file / directory / missing)
       const typeResult = await sshPool.exec(
