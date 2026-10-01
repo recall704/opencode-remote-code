@@ -1,0 +1,38 @@
+{
+  "//": "GENERATED — build artifacts of opencode-remote-code from main@d62e773. Do not edit; rebuild with scripts/publish-release.sh. Sources: https://github.com/recall704/opencode-remote-code",
+  "name": "opencode-remote-code",
+  "version": "0.1.0",
+  "description": "OpenCode plugin for remote machine control over SSH",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "ssh",
+    "remote",
+    "agent"
+  ],
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.15.0"
+  },
+  "dependencies": {
+    "diff": "^9.0.0",
+    "ssh2": "^1.17.0",
+    "zod": "^3.22.0"
+  }
+}
