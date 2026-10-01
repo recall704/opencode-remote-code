@@ -54,23 +54,40 @@
 
 ## 🚀 安装
 
-本插件包含外部依赖且需要构建，**必须从源码安装**。
+以下三种方式任选其一。方式 1 无需本地编译；方式 2、3 需要先本地构建。
+
+### 方式 1：直接从 GitHub 安装（无需本地编译，推荐）
+
+在 `opencode.json(c)` 中加上 `release` 分支即可：
+
+```jsonc
+{
+  "plugin": ["github:recall704/opencode-remote-code#release"]
+}
+```
+
+OpenCode 会自行安装该 git 依赖（Bun 拉取该分支以及它声明的 `ssh2`/`diff` 依赖），重启 OpenCode 后生效。`release` 分支**只有构建产物**——一个生成的 `package.json` 加 `dist/`——本机不需要执行任何构建。
+
+```bash
+# 也可以用 Bun 显式安装该分支
+bun add "github:recall704/opencode-remote-code#release"
+```
+
+### 方式 2：单文件即插即用（需先本地构建）
+
+先编译：
 
 ```bash
 # 1. 下载或克隆
-git clone https://github.com/zz6zz666/opencode-remote-code.git
-
-# 2. 安装依赖并构建
+git clone https://github.com/recall704/opencode-remote-code.git
 cd opencode-remote-code
+
+# 2. 安装依赖并构建（需要 Node.js >= 20 或 Bun）
 npm install
 npm run build
 ```
 
-构建完成后，选择以下任一方式：
-
-### 方式 A：单文件即插即用（推荐，零依赖）
-
-`npm run build` 会额外生成一个**完全自包含的打包文件** `dist/plugins/remote-code.js`。
+`npm run build` 会生成一个**完全自包含的打包文件** `dist/plugins/remote-code.js`。
 它不需要 `node_modules`、不需要 `package.json`、也不需要写任何配置——仅凭文件名即可被自动加载：
 
 ```bash
@@ -83,9 +100,9 @@ Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
 
 以上即全部安装步骤。重启 OpenCode 后插件自动生效。
 
-> OpenCode 自动发现的是**文件**，匹配 `~/.config/opencode/plugins/*.{ts,js}`（全局）或 `.opencode/plugins/*.{ts,js}`（项目级）。像 `plugins/remote-code/` 这样的**目录不会被自动发现**，只有在 `plugin` 数组中显式列出才会加载（见方式 B）。`.mjs` 同样不匹配。
+> OpenCode 自动发现的是**文件**，匹配 `~/.config/opencode/plugins/*.{ts,js}`（全局）或 `.opencode/plugins/*.{ts,js}`（项目级）。像 `plugins/remote-code/` 这样的**目录不会被自动发现**，只有在 `plugin` 数组中显式列出才会加载（见方式 3）。`.mjs` 同样不匹配。
 
-### 方式 B：直接引用源码目录（开发用）
+### 方式 3：直接引用源码目录（开发用）
 
 保持插件原位，在 `plugin` 数组中列出该目录（包目录会按其 `package.json` 的 `main`/`exports` 加载）：
 
@@ -97,9 +114,43 @@ Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
 
 开发时可用 `npm run dev` 监听变更并自动重新构建。
 
+### 构建命令速查
+
+| 命令 | 作用 |
+|---|---|
+| `npm install` | 安装依赖（含 `esbuild` 开发依赖） |
+| `npm run build` | `tsc` → `dist/`，然后 `postbuild`：修正工具模块导入、把 `src/prompts/*.txt` 拷到 `dist/prompts/`、并打包出 `dist/plugins/remote-code.js` |
+| `npm run dev` | `tsc --watch`（不打包） |
+| `npm run lint` | 仅做 `tsc --noEmit` 类型检查 |
+
+打包产物是面向 Node 20+ 的 ESM 单文件。`cpu-features` 与 ssh2 的可选原生模块 `sshcrypto.node` 保留为外部依赖——ssh2 在 `try`/`catch` 中引用它们，缺失时回退到 Node 原生 `crypto`。banner 中的 `require`/`__dirname`/`__filename` 垫片让它同时能在 Bun 和纯 Node ESM 下加载。
+
+### 维护 `release` 分支
+
+`release` 是**纯构建产物分支**：只有一个无父提交（parentless），其目录树就是构建产物，除此之外什么都没有。
+
+```
+release
+├── package.json   生成的清单——只保留运行时依赖，无 scripts、无 devDependencies
+└── dist/          `npm run build` 的输出，含 drop-in 单文件 dist/plugins/remote-code.js
+```
+
+没有源码、没有脚本、没有启动器、没有 tsconfig，也不携带 `main` 的历史——这个分支是拿来安装的，不是拿来阅读的。清单由 `scripts/release-manifest.mjs` 生成，使该分支同时是一个合法包（`github:...#release` 就是按包解析的）。
+
+每次发布都从头重建，因此推送使用 `--force`：
+
+```bash
+bash scripts/publish-release.sh            # 构建、提交、强制推送
+bash scripts/publish-release.sh --no-push  # 只构建并提交
+```
+
+可用 `RELEASE_REMOTE` / `RELEASE_REMOTE_URL` 指向其它 fork，用 `RELEASE_SOURCE_BRANCH` 换源分支。
+
 ---
 
 ## 🎯 使用方式
+
+> **启动脚本的 fail-fast 行为**：只要启动脚本报错，就说明什么都没有启动——OpenCode 不会回退到本地会话。
 
 远程模式**仅通过环境变量激活**。OpenCode CLI 不识别 `--remote*` 参数，且 `opencode.json` 中的 plugin options 会因内部缓存而不可靠。
 
@@ -130,9 +181,14 @@ Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
    ```
 
 启动脚本会自动完成以下操作：
+- **失败即报错（fail-fast）**：启动 OpenCode 之前会依次检查 `opencode` 是否在 `PATH` 中、插件是否已安装、`REMOTE_SSH` 是否带可用凭据、主机/端口是否可达、远端 workdir 是否存在。任一检查失败都会打印原因并以非零状态退出，不会默默把你丢进一个本地 OpenCode 会话
 - 创建并进入稳定的本地会话目录（例如 `~/.opencode/remote-sessions/host_home_project/`）
 - 导出所需的环境变量
 - 从该稳定目录启动 OpenCode
+
+配置块中的每个值都可以用环境变量覆盖，另外 `REMOTE_SKIP_PREFLIGHT=1` 可跳过所有检查（`--version` / `--help` 会自动跳过）。
+
+> 凭据检查是必要的，因为插件使用 `ssh2` 库认证，而它**不会**读取 `~/.ssh/config` 和默认密钥文件：`REMOTE_SSH` 必须显式带 `-i /path/to/key`（或设置非空的 `REMOTE_PASSWORD`），否则插件会以 *"All configured authentication methods failed"* 加载失败。
 
 如果你的远程是 legacy SSH 服务器（例如 OpenSSH 5.3），还可以取消脚本中可选的 **SSH 连接池调优** 变量注释，以调整并发连接数。
 

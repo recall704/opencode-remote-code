@@ -224,15 +224,24 @@ bun run build
 
 ### Install
 
-Preferred: the single-file bundle produced by `bundle.mjs` (no `node_modules`, no config entry,
-matched by auto-discovery's `plugins/*.{ts,js}` glob since it is a plain file):
+Three paths, in order of convenience:
+
+**1. From GitHub, no local build** — the generated `release` branch carries *only* build output
+(generated `package.json` + `dist/`, single parentless commit, no sources, no history):
+
+```jsonc
+{ "plugin": ["github:recall704/opencode-remote-code#release"] }
+```
+
+**2. Single-file bundle** produced by `bundle.mjs` (no `node_modules`, no config entry, matched by
+auto-discovery's `plugins/*.{ts,js}` glob since it is a plain file):
 
 ```bash
 cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
 ```
 
-Alternative (package directory): auto-discovery never descends into subdirectories, so a directory
-must be listed explicitly in `opencode.json(c)`:
+**3. Package directory** — auto-discovery never descends into subdirectories, so a directory must be
+listed explicitly in `opencode.json(c)`:
 
 ```jsonc
 { "plugin": ["/absolute/path/to/opencode-remote-code"] }
@@ -241,11 +250,27 @@ must be listed explicitly in `opencode.json(c)`:
 > `cp -r dist/ ~/.config/opencode/plugins/remote-code` does **not** work by itself — `plugins/`
 is scanned for files only, never folders, and `.mjs` is not matched.
 
+### Release branch
+
+`release` is a build-artifact branch: one parentless commit containing a generated `package.json`
+(from `scripts/release-manifest.mjs` — runtime deps only, no scripts/devDependencies) and `dist/`.
+No sources, no history from `main`. Bun checks a git dependency out as-is and runs no build step, so
+that is all the consumer needs. Regenerate it with `bash scripts/publish-release.sh` (`--no-push` to
+skip the force push); `RELEASE_REMOTE` / `RELEASE_REMOTE_URL` / `RELEASE_SOURCE_BRANCH` override the
+defaults. The branch is rebuilt from scratch on every publish, hence the force push.
+
 ### Usage with Launcher
 
 1. Copy `launchers/remote-opencode.sh` (or `.ps1`) to a location in your `$PATH`.
 2. Edit the "User Configuration" block inside the launcher with your `REMOTE_SSH`, `REMOTE_WORKDIR`, and `REMOTE_PASSWORD`.
 3. Run the launcher instead of `opencode` directly.
+
+The launcher fails fast: it verifies `opencode` is in `PATH`, the plugin is installed, `REMOTE_SSH`
+carries an explicit `-i <key>` (or `REMOTE_PASSWORD` is set — the ssh2 library ignores
+`~/.ssh/config` and default keys), the host is reachable, and the remote workdir exists. On failure it
+prints the reason and exits non-zero rather than starting a local session. `REMOTE_SKIP_PREFLIGHT=1`
+bypasses the checks; `--version` / `--help` skip them automatically. All config values are
+environment-overridable.
 
 ---
 
