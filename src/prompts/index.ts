@@ -1,11 +1,16 @@
 import { readFileSync } from "fs"
 import { fileURLToPath } from "url"
 import path from "path"
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+import { INLINE_PROMPTS } from "./inline.js"
 
 function load(name: string): string {
-  return readFileSync(path.join(__dirname, `${name}.txt`), "utf-8")
+  // In the bundled single-file build the prompts are inlined; otherwise they
+  // are read from the `*.txt` files sitting next to this module.
+  const inlined = INLINE_PROMPTS[name]
+  if (inlined !== undefined) return inlined
+
+  const dir = path.dirname(fileURLToPath(import.meta.url))
+  return readFileSync(path.join(dir, `${name}.txt`), "utf-8")
 }
 
 const PROMPTS: Record<string, string> = {

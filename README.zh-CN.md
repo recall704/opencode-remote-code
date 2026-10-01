@@ -68,23 +68,26 @@ npm run build
 
 构建完成后，选择以下任一方式：
 
-### 方式 A：复制到 OpenCode 插件目录（推荐）
+### 方式 A：单文件即插即用（推荐，零依赖）
 
-将构建好的插件复制到 OpenCode 插件目录，之后即可删除原始下载：
+`npm run build` 会额外生成一个**完全自包含的打包文件** `dist/plugins/remote-code.js`。
+它不需要 `node_modules`、不需要 `package.json`、也不需要写任何配置——仅凭文件名即可被自动加载：
 
 ```bash
 # Linux/macOS:
-cp -r . ~/.config/opencode/plugins/remote-code
+cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
 
 # Windows (PowerShell):
-Copy-Item -Recurse -Force . $env:USERPROFILE\.config\opencode\plugins\remote-code
+Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
 ```
 
-> OpenCode 从 `~/.config/opencode/plugins/`（全局）或 `.opencode/plugins/`（项目级）加载本地插件。目录必须包含 `package.json` 和构建好的 `dist/` 文件夹。
+以上即全部安装步骤。重启 OpenCode 后插件自动生效。
 
-### 方式 B：直接引用源码路径（开发用）
+> OpenCode 自动发现的是**文件**，匹配 `~/.config/opencode/plugins/*.{ts,js}`（全局）或 `.opencode/plugins/*.{ts,js}`（项目级）。像 `plugins/remote-code/` 这样的**目录不会被自动发现**，只有在 `plugin` 数组中显式列出才会加载（见方式 B）。`.mjs` 同样不匹配。
 
-保持插件原位，让 OpenCode 直接引用：
+### 方式 B：直接引用源码目录（开发用）
+
+保持插件原位，在 `plugin` 数组中列出该目录（包目录会按其 `package.json` 的 `main`/`exports` 加载）：
 
 ```json
 {

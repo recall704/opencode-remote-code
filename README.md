@@ -76,23 +76,26 @@ npm run build
 
 After building, choose one of the following:
 
-### Option A: Copy to OpenCode plugin directory (recommended)
+### Option A: Drop-in single file (recommended — zero dependencies)
 
-Copy the built plugin into OpenCode's plugin directory so you can delete the original download:
+`npm run build` emits a **fully self-contained bundle** at `dist/plugins/remote-code.js`.
+It needs no `node_modules`, no `package.json`, and no config entry — the filename alone is enough:
 
 ```bash
 # Linux/macOS:
-cp -r . ~/.config/opencode/plugins/remote-code
+cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
 
 # Windows (PowerShell):
-Copy-Item -Recurse -Force . $env:USERPROFILE\.config\opencode\plugins\remote-code
+Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
 ```
 
-> OpenCode loads local plugins from `~/.config/opencode/plugins/` (global) or `.opencode/plugins/` (project-level). The directory must contain `package.json` and the built `dist/` folder.
+That is the entire install. Restart OpenCode and the plugin loads.
 
-### Option B: Reference the source directly (for development)
+> OpenCode auto-discovers **files** matching `~/.config/opencode/plugins/*.{ts,js}` (global) or `.opencode/plugins/*.{ts,js}` (project-level). A *directory* such as `plugins/remote-code/` is **not** auto-discovered — it only loads when listed in the `plugin` array (see Option B). `.mjs` is not matched either.
 
-Keep the plugin in place and point OpenCode at it:
+### Option B: Reference the source directory (for development)
+
+Keep the plugin in place and list the directory in the `plugin` array (a package directory is loaded through its `package.json` `main`/`exports`):
 
 ```json
 {

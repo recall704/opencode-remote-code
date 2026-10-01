@@ -224,10 +224,22 @@ bun run build
 
 ### Install
 
+Preferred: the single-file bundle produced by `bundle.mjs` (no `node_modules`, no config entry,
+matched by auto-discovery's `plugins/*.{ts,js}` glob since it is a plain file):
+
 ```bash
-# OpenCode plugins directory
-cp -r dist/ ~/.config/opencode/plugins/remote-code
+cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
 ```
+
+Alternative (package directory): auto-discovery never descends into subdirectories, so a directory
+must be listed explicitly in `opencode.json(c)`:
+
+```jsonc
+{ "plugin": ["/absolute/path/to/opencode-remote-code"] }
+```
+
+> `cp -r dist/ ~/.config/opencode/plugins/remote-code` does **not** work by itself — `plugins/`
+is scanned for files only, never folders, and `.mjs` is not matched.
 
 ### Usage with Launcher
 
@@ -245,8 +257,8 @@ cp -r dist/ ~/.config/opencode/plugins/remote-code
 bun install
 bun run build
 
-# Install as OpenCode plugin
-cp -r dist/ ~/.config/opencode/plugins/remote-code
+# Install as OpenCode plugin (single-file bundle; auto-discovered by filename)
+cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
 ```
 
 ## Testing
