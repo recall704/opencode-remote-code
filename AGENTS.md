@@ -120,23 +120,23 @@ Local:   ~/.opencode/mirrors/root_192.168.1.3/home_project/home/project/src/main
          ▼                        ▼
 ┌──────────────────────┐  ┌─────────────────────────────────┐
 │  Server Plugin       │  │  TUI Plugin                     │
-│  (dist/index.js)     │  │  (dist/tui.jsx)                 │
-│                      │  │                                 │
-│  ┌─────────────┐     │  │  ┌───────────────────────────┐  │
-│  │ Tool Overrides│    │  │  │ session_prompt_right      │  │
-│  │ (bash/glob/  │     │  │  │ home_prompt_right         │  │
-│  │  grep/read/  │     │  │  │ → "🌐 Remote: host /path" │  │
-│  │  write/edit/ │     │  │  └───────────────────────────┘  │
-│  │  patch)      │     │  └─────────────────────────────────┘
-│  └──────┬───────┘     │
-│         │             │
-│         ▼             │
-│  ┌─────────────────┐  │
-│  │  PathMapper     │  │
-│  │  SyncEngine     │  │
-│  │  SSHPool        │  │
-│  └─────────────────┘  │
-└───────────┬───────────┘
+│  (dist/plugins/      │  │  (dist/tui.jsx)                 │
+│   remote-code.js)    │  │                                 │
+│  ┌────────────────┐  │  │  ┌───────────────────────────┐  │
+│  │ Tool Overrides │  │  │  │ session_prompt_right      │  │
+│  │ (bash/glob/    │  │  │  │ home_prompt_right         │  │
+│  │  grep/read/    │  │  │  │ → "🌐 Remote: host /path" │  │
+│  │  write/edit/   │  │  │  └───────────────────────────┘  │
+│  │  patch)        │  │  └─────────────────────────────────┘
+│  └────────┬───────┘  │
+│           │          │
+│           ▼          │
+│  ┌─────────────────┐ │
+│  │  PathMapper     │ │
+│  │  SyncEngine     │ │
+│  │  SSHPool        │ │
+│  └─────────────────┘ │
+└───────────┬──────────┘
             │
             ▼
 ┌──────────────────────────────────────────────┐
@@ -222,42 +222,28 @@ bun install
 bun run build
 ```
 
+`build` is `tsc`, emitting into the `.build/` staging tree rather than `dist/`. The `postbuild` hook
+then patches the tool imports and stages `src/prompts/*.txt`, and `scripts/bundle.mjs` inlines
+everything into `dist/plugins/remote-code.js` — wiping `dist/` first and deleting `.build/`
+afterwards. The net effect is that `dist/` contains that one bundled file and nothing else: no
+per-module `.js`, no `.d.ts`, no source maps, no copied prompt files. `tsconfig.json` keeps
+`declaration` / `declarationMap` / `sourceMap` off for the same reason — nothing outside the bundle
+consumes them.
+
 ### Install
 
-Three paths, in order of convenience:
-
-**1. From GitHub, no local build** — the generated `release` branch carries *only* build output
-(generated `package.json` + `dist/`, single parentless commit, no sources, no history):
-
-```jsonc
-{ "plugin": ["github:recall704/opencode-remote-code#release"] }
-```
-
-**2. Single-file bundle** produced by `bundle.mjs` (no `node_modules`, no config entry, matched by
-auto-discovery's `plugins/*.{ts,js}` glob since it is a plain file):
+Single-file drop-in — `bundle.mjs` produces a fully self-contained file that needs no `node_modules`,
+no `package.json`, and no config entry:
 
 ```bash
 cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
 ```
 
-**3. Package directory** — auto-discovery never descends into subdirectories, so a directory must be
-listed explicitly in `opencode.json(c)`:
+That is the entire install. Restart OpenCode and it loads.
 
-```jsonc
-{ "plugin": ["/absolute/path/to/opencode-remote-code"] }
-```
-
-> `cp -r dist/ ~/.config/opencode/plugins/remote-code` does **not** work by itself — `plugins/`
-is scanned for files only, never folders, and `.mjs` is not matched.
-
-### Release branch
-
-`release` is a build-artifact branch: one parentless commit containing a generated `package.json`
-(from `scripts/release-manifest.mjs` — runtime deps only, no scripts/devDependencies) and `dist/`.
-No sources, no history from `main`. Bun checks a git dependency out as-is and runs no build step, so
-that is all the consumer needs. Regenerate it with `bash scripts/publish-release.sh` (`--no-push` to
-skip the force push); `RELEASE_REMOTE` / `RELEASE_REMOTE_URL` / `RELEASE_SOURCE_BRANCH` override the
-defaults. The branch is rebuilt from scratch on every publish, hence the force push.
+> Two things that do **not** work: `cp -r dist/ ~/.config/opencode/plugins/remote-code` — `plugins/`
+is scanned for files only, never folders — and renaming the bundle to `.mjs`, which the
+`plugins/*.{ts,js}` auto-discovery glob does not match.
 
 ### Usage with Launcher
 
@@ -273,18 +259,6 @@ bypasses the checks; `--version` / `--help` skip them automatically. All config 
 environment-overridable.
 
 ---
-
-## Build & Install (Legacy)
-
-
-```bash
-# Local development
-bun install
-bun run build
-
-# Install as OpenCode plugin (single-file bundle; auto-discovered by filename)
-cp dist/plugins/remote-code.js ~/.config/opencode/plugins/
-```
 
 ## Testing
 

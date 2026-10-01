@@ -137,8 +137,8 @@ if ! skip_preflight "$@"; then
     "  ~/.config/opencode/plugins/remote-code/package.json" \
     "  a \"remote-code\" entry in ~/.config/opencode/opencode.json(c)" \
     "" \
-    "Install with:  cp dist/plugins/remote-code.js ~/.config/opencode/plugins/" \
-    "or add to opencode.jsonc:  \"plugin\": [\"github:recall704/opencode-remote-code#release\"]"
+    "Install with:" \
+    "  bun run build && cp dist/plugins/remote-code.js ~/.config/opencode/plugins/"
 
   # 3. The plugin authenticates with the ssh2 library, which ignores
   #    ~/.ssh/config and the default key files. Without an explicit key or a

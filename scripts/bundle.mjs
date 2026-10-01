@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * Produces the drop-in single-file build: `dist/plugins/remote-code.js`.
+ * Produces the one and only build artifact: `dist/plugins/remote-code.js`.
  *
  * OpenCode auto-discovers plugins by globbing `{plugin,plugins}/*.{ts,js}` —
- * files only, never sub-directories. A plugin *package* directory therefore has
- * to be registered manually in `opencode.json(c)` (`"plugin": ["./plugins/remote-code"]`),
- * while this bundled file only has to be copied into `~/.config/opencode/plugins/`.
+ * files only, never sub-directories — so this single file only has to be copied
+ * into `~/.config/opencode/plugins/`.
+ *
+ * Input is the `tsc` staging tree `.build/`, which is deleted on success. That
+ * keeps `dist/` holding the bundled plugin and nothing else: no per-module
+ * `.js`, no declarations, no source maps, no copied prompt files.
  *
  * Everything except Node built-ins is inlined, including the prompt texts that
  * `src/prompts/index.ts` otherwise reads from disk next to itself, so the file
@@ -18,13 +21,17 @@ import { fileURLToPath } from "node:url"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const promptsDir = path.join(root, "src", "prompts")
-const entry = path.join(root, "dist", "index.js")
-const outfile = path.join(root, "dist", "plugins", "remote-code.js")
+// tsc output goes to a staging tree, not to `dist/`, so that the published
+// artifact directory never accumulates intermediate files.
+const buildDir = path.join(root, ".build")
+const distDir = path.join(root, "dist")
+const entry = path.join(buildDir, "index.js")
+const outfile = path.join(distDir, "plugins", "remote-code.js")
 
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
 
 /**
- * Replaces `dist/prompts/inline.js` (which is empty after `tsc`) with a
+ * Replaces `.build/prompts/inline.js` (which is empty after `tsc`) with a
  * generated module holding the full text of every prompt file.
  */
 const inlinePromptsPlugin = {
@@ -67,6 +74,10 @@ const inlinePromptsPlugin = {
  */
 const optionalNativeModules = ["cpu-features", "./crypto/build/Release/sshcrypto.node"]
 
+// Start from a clean `dist/` so an earlier build can never leave stale files
+// behind — its only contents should ever be the bundled plugin.
+fs.rmSync(distDir, { recursive: true, force: true })
+
 const result = await build({
   entryPoints: [entry],
   outfile,
@@ -105,6 +116,10 @@ if (result.warnings.length > 0) {
     console.warn(`[bundle] warning: ${warning.text}`)
   }
 }
+
+// The staging tree has served its purpose; leaving it in place would defeat the
+// point of building it outside `dist/` in the first place.
+fs.rmSync(buildDir, { recursive: true, force: true })
 
 const bytes = fs.statSync(outfile).size
 console.log(`[bundle] Wrote ${path.relative(root, outfile)} (${(bytes / 1024).toFixed(0)} KB)`)

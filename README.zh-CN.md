@@ -54,41 +54,22 @@
 
 ## 🚀 安装
 
-以下三种方式任选其一。方式 1 无需本地编译；方式 2、3 需要先本地构建。
+安装只有一条路：先构建单文件，再把这一个文件拷进去，重启 OpenCode。不需要 `node_modules`、不需要 `package.json`、也不需要写 `opencode.json` 配置。
 
-### 方式 1：直接从 GitHub 安装（无需本地编译，推荐）
-
-在 `opencode.json(c)` 中加上 `release` 分支即可：
-
-```jsonc
-{
-  "plugin": ["github:recall704/opencode-remote-code#release"]
-}
-```
-
-OpenCode 会自行安装该 git 依赖（Bun 拉取该分支以及它声明的 `ssh2`/`diff` 依赖），重启 OpenCode 后生效。`release` 分支**只有构建产物**——一个生成的 `package.json` 加 `dist/`——本机不需要执行任何构建。
+### 1. 构建单文件
 
 ```bash
-# 也可以用 Bun 显式安装该分支
-bun add "github:recall704/opencode-remote-code#release"
-```
-
-### 方式 2：单文件即插即用（需先本地构建）
-
-先编译：
-
-```bash
-# 1. 下载或克隆
 git clone https://github.com/recall704/opencode-remote-code.git
 cd opencode-remote-code
 
-# 2. 安装依赖并构建（需要 Node.js >= 20 或 Bun）
+# 需要 Node.js >= 20 或 Bun；`bun install && bun run build` 亦可
 npm install
 npm run build
 ```
 
-`npm run build` 会生成一个**完全自包含的打包文件** `dist/plugins/remote-code.js`。
-它不需要 `node_modules`、不需要 `package.json`、也不需要写任何配置——仅凭文件名即可被自动加载：
+`npm run build` 会生成一个**完全自包含的打包文件** `dist/plugins/remote-code.js`——依赖（含 `ssh2`）和 prompt 文本都已内联。
+
+### 2. 拷贝到插件目录
 
 ```bash
 # Linux/macOS:
@@ -100,51 +81,20 @@ Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
 
 以上即全部安装步骤。重启 OpenCode 后插件自动生效。
 
-> OpenCode 自动发现的是**文件**，匹配 `~/.config/opencode/plugins/*.{ts,js}`（全局）或 `.opencode/plugins/*.{ts,js}`（项目级）。像 `plugins/remote-code/` 这样的**目录不会被自动发现**，只有在 `plugin` 数组中显式列出才会加载（见方式 3）。`.mjs` 同样不匹配。
-
-### 方式 3：直接引用源码目录（开发用）
-
-保持插件原位，在 `plugin` 数组中列出该目录（包目录会按其 `package.json` 的 `main`/`exports` 加载）：
-
-```json
-{
-  "plugin": ["/absolute/path/to/opencode-remote-code"]
-}
-```
-
-开发时可用 `npm run dev` 监听变更并自动重新构建。
+> OpenCode 自动发现的是**文件**，匹配 `~/.config/opencode/plugins/*.{ts,js}`（全局）或 `.opencode/plugins/*.{ts,js}`（项目级），所以仅凭文件名即可被加载。以下两种做法**不行**：把插件放进 `plugins/remote-code/` 这样的**目录**（只扫文件、不递归子目录），以及把产物重命名为 `.mjs`（不匹配该 glob）。
 
 ### 构建命令速查
 
 | 命令 | 作用 |
 |---|---|
 | `npm install` | 安装依赖（含 `esbuild` 开发依赖） |
-| `npm run build` | `tsc` → `dist/`，然后 `postbuild`：修正工具模块导入、把 `src/prompts/*.txt` 拷到 `dist/prompts/`、并打包出 `dist/plugins/remote-code.js` |
-| `npm run dev` | `tsc --watch`（不打包） |
+| `npm run build` | `tsc` → `.build/`（中转目录），`postbuild` 修正工具模块导入并暂存 prompt 文本，`bundle.mjs` 把一切内联进 `dist/plugins/remote-code.js` 后删除 `.build/` |
+| `npm run dev` | `tsc --watch` 输出到 `.build/`（不打包） |
 | `npm run lint` | 仅做 `tsc --noEmit` 类型检查 |
 
+每次打包开始前会清空 `dist/`，结束后删除中转目录，因此 `dist/` 里只有这一个文件——没有分模块的 `.js`、没有 `.d.ts`、没有 source map、也没有拷出来的 prompt 文件。
+
 打包产物是面向 Node 20+ 的 ESM 单文件。`cpu-features` 与 ssh2 的可选原生模块 `sshcrypto.node` 保留为外部依赖——ssh2 在 `try`/`catch` 中引用它们，缺失时回退到 Node 原生 `crypto`。banner 中的 `require`/`__dirname`/`__filename` 垫片让它同时能在 Bun 和纯 Node ESM 下加载。
-
-### 维护 `release` 分支
-
-`release` 是**纯构建产物分支**：只有一个无父提交（parentless），其目录树就是构建产物，除此之外什么都没有。
-
-```
-release
-├── package.json   生成的清单——只保留运行时依赖，无 scripts、无 devDependencies
-└── dist/          `npm run build` 的输出，含 drop-in 单文件 dist/plugins/remote-code.js
-```
-
-没有源码、没有脚本、没有启动器、没有 tsconfig，也不携带 `main` 的历史——这个分支是拿来安装的，不是拿来阅读的。清单由 `scripts/release-manifest.mjs` 生成，使该分支同时是一个合法包（`github:...#release` 就是按包解析的）。
-
-每次发布都从头重建，因此推送使用 `--force`：
-
-```bash
-bash scripts/publish-release.sh            # 构建、提交、强制推送
-bash scripts/publish-release.sh --no-push  # 只构建并提交
-```
-
-可用 `RELEASE_REMOTE` / `RELEASE_REMOTE_URL` 指向其它 fork，用 `RELEASE_SOURCE_BRANCH` 换源分支。
 
 ---
 

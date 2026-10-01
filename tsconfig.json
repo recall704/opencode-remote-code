@@ -5,15 +5,15 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "jsx": "preserve",
-    "outDir": "./dist",
+    "outDir": "./.build",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
     "resolveJsonModule": true,
     "noUnusedLocals": true,
     "noUnusedParameters": false,
@@ -23,5 +23,5 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", ".build"]
 }

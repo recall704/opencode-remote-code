@@ -3,7 +3,10 @@ node_modules/
 package-lock.json
 
 # Build outputs
+# dist/ holds only the final bundled plugin; .build/ is the throwaway tsc tree
+# that scripts/bundle.mjs consumes and deletes.
 dist/
+.build/
 *.tsbuildinfo
 
 # Temporary / reference files

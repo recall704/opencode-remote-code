@@ -62,41 +62,22 @@ different workflows:
 
 ## 🚀 Installation
 
-Pick one of the following. Option 1 needs no local build; options 2 and 3 do.
+Installation is a single-file drop-in: build once, copy one file, restart OpenCode. No `node_modules`, no `package.json`, no `opencode.json` entry.
 
-### Option 1: Install straight from GitHub (no local build) — recommended
-
-Add the `release` branch to your `opencode.json(c)`:
-
-```jsonc
-{
-  "plugin": ["github:recall704/opencode-remote-code#release"]
-}
-```
-
-OpenCode installs the git dependency itself (Bun fetches the branch and its `ssh2`/`diff` dependencies); restart OpenCode afterwards. The `release` branch contains **build output only** — a generated `package.json` plus `dist/` — so nothing is compiled on your machine.
+### 1. Build the bundle
 
 ```bash
-# Or pick the branch explicitly with Bun
-bun add "github:recall704/opencode-remote-code#release"
-```
-
-### Option 2: Drop-in single file (after a local build)
-
-Build first:
-
-```bash
-# 1. Download or clone
 git clone https://github.com/recall704/opencode-remote-code.git
 cd opencode-remote-code
 
-# 2. Install dependencies and build (needs Node.js >= 20 or Bun)
+# needs Node.js >= 20 or Bun; `bun install && bun run build` also works
 npm install
 npm run build
 ```
 
-`npm run build` emits a **fully self-contained bundle** at `dist/plugins/remote-code.js`.
-It needs no `node_modules`, no `package.json`, and no config entry — the filename alone is enough:
+`npm run build` emits a **fully self-contained bundle** at `dist/plugins/remote-code.js` — dependencies (including `ssh2`) and the prompt texts are inlined.
+
+### 2. Copy it into place
 
 ```bash
 # Linux/macOS:
@@ -108,55 +89,22 @@ Copy-Item dist\plugins\remote-code.js $env:USERPROFILE\.config\opencode\plugins\
 
 That is the entire install. Restart OpenCode and the plugin loads.
 
-> OpenCode auto-discovers **files** matching `~/.config/opencode/plugins/*.{ts,js}` (global) or `.opencode/plugins/*.{ts,js}` (project-level). A *directory* such as `plugins/remote-code/` is **not** auto-discovered — it only loads when listed in the `plugin` array (see Option 3). `.mjs` is not matched either.
-
-### Option 3: Reference the source directory (for development)
-
-Keep the plugin in place and list the directory in the `plugin` array (a package directory is loaded through its `package.json` `main`/`exports`):
-
-```json
-{
-  "plugin": ["/absolute/path/to/opencode-remote-code"]
-}
-```
-
-Use `npm run dev` for watch-mode builds during development.
+> OpenCode auto-discovers **files** matching `~/.config/opencode/plugins/*.{ts,js}` (global) or `.opencode/plugins/*.{ts,js}` (project-level), so the filename alone is enough. Two things that do **not** work: a *directory* such as `plugins/remote-code/` (only files are scanned, never sub-directories) and renaming the bundle to `.mjs` (not matched by the glob).
 
 ### Build reference
 
 | Command | What it does |
 |---|---|
 | `npm install` | Installs deps incl. the `esbuild` devDependency |
-| `npm run build` | `tsc` → `dist/`, then `postbuild`: patches tool imports, copies `src/prompts/*.txt` into `dist/prompts/`, and bundles `dist/plugins/remote-code.js` |
-| `npm run dev` | `tsc --watch` (no bundling) |
+| `npm run build` | `tsc` → `.build/` (staging), then `postbuild` patches tool imports and stages the prompt texts, then `bundle.mjs` inlines everything into `dist/plugins/remote-code.js` and deletes `.build/` |
+| `npm run dev` | `tsc --watch` into `.build/` (no bundling) |
 | `npm run lint` | `tsc --noEmit` type-check only |
 
+`dist/` is wiped at the start of every bundle step and the staging tree is deleted at the end, so it
+holds that single file and nothing else — no per-module `.js`, no `.d.ts`, no source maps, no copied
+prompt files.
+
 The bundle is an ESM single file targeting Node 20+. `cpu-features` and ssh2's optional native `sshcrypto.node` stay external — ssh2 requires them inside `try`/`catch` and falls back to Node's `crypto`. The `require`/`__dirname`/`__filename` shims in the banner let it load under Bun *and* plain Node ESM.
-
-### Maintaining the `release` branch
-
-The `release` branch is a **build-artifact branch**: a single, parentless commit whose tree is the build
-output and nothing else.
-
-```
-release
-├── package.json   generated manifest — runtime deps only, no scripts, no devDependencies
-└── dist/          output of `npm run build`, incl. the drop-in bundle dist/plugins/remote-code.js
-```
-
-No sources, no scripts, no launchers, no tsconfig, and no history from `main` — the branch exists to be
-installed, not read. The manifest is produced by `scripts/release-manifest.mjs` so the branch doubles as
-a valid package (which is what `github:...#release` resolves against).
-
-It is recreated from scratch on every publish, so the push is forced:
-
-```bash
-bash scripts/publish-release.sh            # build, commit, force-push
-bash scripts/publish-release.sh --no-push  # build and commit only
-```
-
-Point it at a different fork with `RELEASE_REMOTE` / `RELEASE_REMOTE_URL`, or publish a different
-branch with `RELEASE_SOURCE_BRANCH`.
 
 ---
 
